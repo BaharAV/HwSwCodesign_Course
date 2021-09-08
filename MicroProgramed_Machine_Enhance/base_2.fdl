@@ -1,0 +1,168 @@
+dp control(in carry, zero : ns(1);
+           out ctl_ot : ns(1);
+           out ctl_sbus : ns(4);
+           out ctl_alu : ns(4);
+           out ctl_shft : ns(3);
+           out ctl_dest : ns(4)) {
+    lookup cstore : ns(32) = {
+        (0 << 31) | (8 << 27) | (1 << 23) | (7 << 20) | (0 << 16) | (0 << 12) | (0),
+        (0 << 31) | (8 << 27) | (1 << 23) | (7 << 20) | (8 << 16) | (0 << 12) | (0),
+        (0 << 31) | (0 << 27) | (4 << 23) | (7 << 20) | (15 << 16) | (4 << 12) | (6),
+        (0 << 31) | (0 << 27) | (4 << 23) | (1 << 20) | (15 << 16) | (2 << 12) | (5),
+        (0 << 31) | (0 << 27) | (4 << 23) | (7 << 20) | (0 << 16) | (1 << 12) | (2),
+        (0 << 31) | (0 << 27) | (3 << 23) | (7 << 20) | (8 << 16) | (1 << 12) | (2),
+        (1 << 31) | (0 << 27) | (0 << 23) | (7 << 20) | (15 << 16) | (1 << 12) | (0)
+    };
+    reg csar : ns(12);
+    sig mir : ns(32);
+    sig ctl_nxt : ns(4);
+    sig csar_nxt : ns(12);
+    sig ctl_address : ns(12);
+    always {
+        mir = cstore(csar);
+        ctl_ot = mir[31];
+        ctl_sbus = mir[27:30];
+        ctl_alu = mir[23:26];
+        ctl_shft = mir[20:22];
+        ctl_dest = mir[16:19];
+        ctl_nxt = mir[12:15];
+        ctl_address = mir[ 0:11];
+        csar_nxt = csar + 1;
+        csar = (ctl_nxt == 0) ? csar_nxt :
+            (ctl_nxt == 1) ? ctl_address :
+            (ctl_nxt == 2) ? ((carry==1) ? ctl_address: csar_nxt) :
+            (ctl_nxt == 4) ? ((zero==1) ? ctl_address: csar_nxt) :
+            (ctl_nxt == 10) ? ((carry==0) ? ctl_address: csar_nxt) :
+            (ctl_nxt == 12) ? ((zero==0) ? ctl_address: csar_nxt) :
+            csar;
+    }
+}
+dp regfile (in ctl_dest : ns(4);
+            in ctl_sbus : ns(4);
+            in data_in : ns(16);
+            out data_out : ns(16)) {
+    reg r0 : ns(16);
+    reg r1 : ns(16);
+    reg r2 : ns(16);
+    reg r3 : ns(16);
+    reg r4 : ns(16);
+    reg r5 : ns(16);
+    reg r6 : ns(16);
+    reg r7 : ns(16);
+    always {
+        r0 = (ctl_dest == 0) ? data_in : r0;
+        r1 = (ctl_dest == 1) ? data_in : r1;
+        r2 = (ctl_dest == 2) ? data_in : r2;
+        r3 = (ctl_dest == 3) ? data_in : r3;
+        r4 = (ctl_dest == 4) ? data_in : r4;
+        r5 = (ctl_dest == 5) ? data_in : r5;
+        r6 = (ctl_dest == 6) ? data_in : r6;
+        r7 = (ctl_dest == 7) ? data_in : r7;
+        data_out = (ctl_sbus == 0) ? r0 :
+                   (ctl_sbus == 1) ? r1 :
+                   (ctl_sbus == 2) ? r2 :
+                   (ctl_sbus == 3) ? r3 :
+                   (ctl_sbus == 4) ? r4 :
+                   (ctl_sbus == 5) ? r5 :
+                   (ctl_sbus == 6) ? r6 :
+                   (ctl_sbus == 7) ? r7 :
+                   r0;
+    }
+}
+dp alu (in ctl_dest : ns(4);
+        in ctl_alu : ns(4);
+        in sbus : ns(16);
+        in shift : ns(16);
+        out q : ns(16)) {
+    reg acc : ns(16);
+    always {
+        q = (ctl_alu == 0) ? acc :
+            (ctl_alu == 1) ? sbus :
+            (ctl_alu == 2) ? acc + sbus :
+            (ctl_alu == 3) ? acc - sbus :
+            (ctl_alu == 4) ? sbus - acc :
+            (ctl_alu == 5) ? acc & sbus :
+            (ctl_alu == 6) ? acc | sbus :
+            (ctl_alu == 7) ? ~ sbus :
+            (ctl_alu == 8) ? sbus + 1 :
+            (ctl_alu == 9) ? acc + 1 :
+            (ctl_alu == 10) ? 0 :
+            (ctl_alu == 11) ? 1 :
+            0;
+        acc = (ctl_dest == 8) ? shift : acc;
+    }
+}
+dp shifter(in ctl : ns(3);
+            out zero : ns(1);
+            out cy : ns(1);
+            in shft_in : ns(16);
+            out so : ns(16)) {
+    always {
+        so = (ctl == 7) ? shft_in :
+             (ctl == 1) ? (ns(16)) (shft_in << 1) :
+             (ctl == 2) ? (ns(16)) (shft_in >> 1) :
+             (ctl == 3) ? (ns(16)) (shft_in # shft_in[16 -1]) :
+             (ctl == 4) ? (ns(16)) (shft_in[0] # (shft_in >> 1)):
+             (ctl == 5) ? (ns(16)) (shft_in << 1) :
+             (ctl == 6) ? (ns(16)) (((tc(16)) shft_in) >> 1) :
+             0;
+        zero = (so == 0);
+        cy = (ctl == 7) ? 0 :
+              (ctl == 1) ? shft_in[16 -1] :
+              (ctl == 2) ? 0 :
+              (ctl == 3) ? shft_in[16 -1] :
+              (ctl == 4) ? shft_in[0] :
+              (ctl == 5) ? shft_in[16 -1] :
+              (ctl == 6) ? 0 :
+              0;
+    }
+}
+dp hmm(in din : ns(16);
+       out din_strb : ns(1);
+       out dout : ns(16);
+       out dout_strb : ns(1)) {
+    sig carry, zero : ns(1);
+    sig ctl_ot : ns(1);
+    sig ctl_sbus : ns(4);
+    sig ctl_alu : ns(4);
+    sig ctl_shft : ns(3);
+    sig ctl_acc : ns(1);
+    sig ctl_dest : ns(4);
+    sig rf_out, rf_in : ns(16);
+    sig sbus : ns(16);
+    sig alu_in : ns(16);
+    sig alu_out : ns(16);
+    sig shft_in : ns(16);
+    sig shft_out : ns(16);
+    use control(carry, zero, ctl_ot, ctl_sbus, ctl_alu, ctl_shft, ctl_dest);
+    use regfile(ctl_dest, ctl_sbus, rf_in, rf_out);
+    use alu (ctl_dest, ctl_alu, sbus, alu_in, alu_out);
+    use shifter(ctl_shft, zero, carry, shft_in, shft_out);
+    always {
+        sbus = (ctl_sbus == 8) ? din : rf_out;
+        din_strb = (ctl_sbus == 8) ? 1 : 0;
+        dout = sbus;
+        dout_strb = (ctl_ot == 1) ? 1 : 0;
+        rf_in = shft_out;
+        alu_in = shft_out;
+        shft_in = alu_out;
+    }
+}
+dp hmmtest {
+    sig din : ns(16);
+    sig din_strb : ns(1);
+    sig dout : ns(16);
+    sig dout_strb : ns(1);
+    use hmm(din, din_strb, dout, dout_strb);
+    reg dcnt : ns(5);
+    lookup stim : ns(16) = {14, 32, 87, 12, 23, 99, 32, 22};
+    always {
+        dcnt = (din_strb) ? dcnt + 1 : dcnt;
+        din = stim(dcnt & 7);
+        $display($cycle, " IO ", din_strb, " ", dout_strb, " ", $dec, din, " ", dout);
+    }
+}
+system S {
+    hmmtest;
+}
+

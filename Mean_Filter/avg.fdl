@@ -1,0 +1,291 @@
+ipblock my8051 { 
+	iptype "i8051system";
+	ipparm "exec=avg.ihx";
+	ipparm "verbose=1";
+	ipparm "period=1";
+}
+
+ipblock port1(out data : ns(8)) {
+	iptype "i8051systemsource";
+	ipparm "core=my8051";
+	ipparm "port=P1";
+}
+
+ipblock port2(in data : ns(8)) {
+	iptype "i8051systemsink";
+	ipparm "core=my8051";
+	ipparm "port=P2";
+}
+
+ipblock my8051_xram(
+	in idata 	: ns(8);
+	out odata 	: ns(8);
+	in address  	: ns(8);
+	in wr 		: ns(1)) {
+	iptype "i8051buffer";
+	ipparm "core=my8051";
+	ipparm "xbus=0x4000";
+	ipparm "xrange=0x64"; // 100 locations at address 0x4000
+}
+
+dp top {
+	sig p0, done : ns(8);
+	
+	sig ramin, ramout, adr : ns(8);
+	sig ramw : ns(1);
+	
+	reg a_reg, b_reg, done_reg, adr_reg, cnt, aa, bb, cc, dd, result : ns(8);
+	reg d0,d1,d2,d3,d4,d5,d6,d7,d8,d9,d10 : ns(8);
+	
+	use my8051;
+	use port1(p0);
+	use port2(done);
+	use my8051_xram(ramin, ramout, adr, ramw);
+	
+	always{
+		b_reg = p0;
+		adr = adr_reg;
+	}
+	sfg wait {
+		ramw = 0;
+		ramin = 0;
+		done = 0;	
+	}
+	sfg start_print {
+		ramw = 0;
+		ramin = 0;
+		done = 0;
+		cnt = 1; 
+	}
+	sfg print_0{
+		ramw = 0;
+		ramin = 0;
+		done = 0;
+		cnt = cnt +1;
+		adr_reg = cnt; 
+		d0 = ramout;
+	}
+	sfg print_1{
+		ramw = 0;
+		ramin = 0;
+		done = 0;
+		cnt = cnt +1;
+		adr_reg = cnt; 
+		d1 = ramout;
+	}
+	sfg print_2{
+		ramw = 0;
+		ramin = 0;
+		done = 0;
+		cnt = cnt +1;
+		adr_reg = cnt; 
+		d2 = ramout;
+	}
+	sfg print_3{
+		ramw = 0;
+		ramin = 0;
+		done = 0;
+		cnt = cnt +1;
+		adr_reg = cnt; 
+		d3 = ramout;
+	}
+	sfg print_4{
+		ramw = 0;
+		ramin = 0;
+		done = 0;
+		cnt = cnt +1;
+		adr_reg = cnt; 
+		d4 = ramout;
+	}
+	sfg print_5{
+		ramw = 0;
+		ramin = 0;
+		done = 0;
+		cnt = cnt +1;
+		adr_reg = cnt; 
+		d5 = ramout;
+	}
+	sfg print_6{
+		ramw = 0;
+		ramin = 0;
+		done = 0;
+		cnt = cnt +1;
+		adr_reg = cnt; 
+		d6 = ramout;
+	}
+	sfg print_7{
+		ramw = 0;
+		ramin = 0;
+		done = 0;
+		cnt = cnt +1;
+		adr_reg = cnt; 
+		d7 = ramout;
+	}
+	sfg print_8{
+		ramw = 0;
+		ramin = 0;
+		done = 0;
+		cnt = cnt +1;
+		adr_reg = cnt; 
+		d8 = ramout;
+	}
+	sfg print_9{
+		ramw = 0;
+		ramin = 0;
+		done = 0;
+		cnt = cnt +1;
+		adr_reg = cnt; 
+		d9 = ramout;
+	}
+	sfg print_10{
+		ramw = 0;
+		ramin = 0;
+		done = 0;
+		$display($dec,d0," ",d1," ",d2," ",d3," ",d4," ",d5," ",d6," ",d7," ",d8," ",d9);
+	}
+	sfg print_line{
+		$display("--------------filtered:--------------");
+	}
+	sfg start_job {
+		ramw = 0;
+		ramin = 0;
+		done = 0;
+		cnt = 10;
+		adr_reg = cnt; 
+	}
+	sfg calculate_1 {
+		ramw = 0;
+		ramin = 0;
+		done = 0;
+		adr_reg = cnt - 10; 
+	}
+	sfg calculate_2 {
+		ramw = 0;
+		ramin = 0;
+		done = 0;
+		adr_reg = cnt + 10; 
+		aa = ramout;
+		//$display("aa: ",$dec, aa);
+	}
+	sfg calculate_3 {
+		ramw = 0;
+		ramin = 0;
+		done = 0;
+		adr_reg = cnt - 1; 
+		bb = ramout;
+		//$display("bb: ",$dec, bb);
+	}
+	sfg calculate_4 {
+		ramw = 0;
+		ramin = 0;
+		done = 0;
+		adr_reg = cnt + 1; 
+		cc = ramout;
+		aa = (aa+bb) >> 1;
+		//$display("cc: ",$dec, cc);
+	}
+	sfg calculate_5 {
+		done = 0;
+		ramw = 0;
+		ramin = 0;
+		adr_reg = cnt; 
+		dd = ramout;
+		//$display("dd: ",$dec, dd);
+	}
+	sfg calculate_6 {
+		done = 0;
+		ramw = 0;
+		ramin = 0;
+		adr_reg = cnt; 
+		cc = (cc+dd) >> 1;
+	}
+	sfg calculate_7 {
+		done = 0;
+		ramw = 0;
+		ramin = 0;
+		adr_reg = cnt; 
+		result = (aa+cc) >> 1;
+	}
+	sfg calculate_8 {
+		done = 0;
+		ramw = 1;
+		adr_reg = cnt; 
+		cnt = cnt + 1;
+		ramin = result;
+		//$display("ramin: ",$dec, " ", ramin);
+	}
+	sfg loop_only {
+		ramw = 0;
+		ramin = 0;
+		done = 0;
+		cnt = cnt +1;
+		adr_reg = cnt;
+		//$display("ramout: ",$dec,cnt," ",ramout);
+	}
+	sfg end_job_1 {
+		ramw = 0;
+		ramin = 0;
+		done = 0;
+		cnt = 1; 
+	}
+	sfg end_job_2 {
+		ramw = 0;
+		ramin = 0;
+		done = 1;
+		cnt = 1; 
+		$display("----------------------------done!----------------------------");
+	}
+	
+ }
+ 
+fsm top_fsm(top){
+	initial s0;
+	state s1, s2, s3, s4, s5, s6, s7,s8,s9,s10,s11,s12,s13,s14,s15,s16,s17,s18,s19,s20,s21,s22,s23,s24,s25,s26,s27,s28,s29,s30;
+	
+	@s0 if (b_reg==1) then (start_print) -> s1;
+		else (wait) -> s0;
+		
+	@s1 if (cnt>99) then (start_job) -> s2;
+	    else (print_0) -> s11;
+
+	@s11 (print_1) -> s12;
+	@s12 (print_2) -> s13;
+	@s13 (print_3) -> s14;
+	@s14 (print_4) -> s15;
+	@s15 (print_5) -> s16;
+	@s16 (print_6) -> s17;
+	@s17 (print_7) -> s18;
+	@s18 (print_8) -> s19;
+	@s19 (print_9) -> s20;
+	@s20 (print_10) -> s1;
+		
+	@s2 if (cnt%10!=0 & cnt%10!=9) then (calculate_1) -> s3;
+	    else if (cnt < 90) then (loop_only) -> s2; 
+	    else (end_job_1,print_line) -> s10;
+
+	@s3 (calculate_2) -> s4;
+	@s4 (calculate_3) -> s5;
+	@s5 (calculate_4) -> s6;
+	@s6 (calculate_5) -> s7;
+	@s7 (calculate_6) -> s8;
+	@s8 (calculate_7) -> s9;
+	@s9 (calculate_8) -> s2;
+
+	@s10 if (cnt>99) then (end_job_2) -> s0;
+	     else (print_0) -> s21;
+
+	@s21 (print_1) -> s22;
+	@s22 (print_2) -> s23;
+	@s23 (print_3) -> s24;
+	@s24 (print_4) -> s25;
+	@s25 (print_5) -> s26;
+	@s26 (print_6) -> s27;
+	@s27 (print_7) -> s28;
+	@s28 (print_8) -> s29;
+	@s29 (print_9) -> s30;
+	@s30 (print_10) -> s10;
+}
+ 
+ system S {
+	top;
+ }

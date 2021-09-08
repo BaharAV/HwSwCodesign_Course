@@ -1,0 +1,367 @@
+ipblock core_block {
+    iptype "armsystem";
+    ipparm "exec=software";
+}
+
+ipblock m_req(
+    out data   :   ns(32)
+) {
+    iptype "armsystemsource";
+    ipparm "core=core_block";
+    ipparm "address=0x80000000";
+}
+
+ipblock m_ack(
+    in data   :   ns(32)
+) {
+    iptype "armsystemsink";
+    ipparm "core=core_block";
+    ipparm "address=0x80000004";
+}
+
+ipblock m_p(
+    out data   :   ns(32)
+) {
+    iptype "armsystemsource";
+    ipparm "core=core_block";
+    ipparm "address=0x80000008";
+}
+ipblock m_q(
+    out data   :   ns(32)
+) {
+    iptype "armsystemsource";
+    ipparm "core=core_block";
+    ipparm "address=0x8000000C";
+}
+ipblock m_msg(
+    out data   :   ns(64)
+) {
+    iptype "armsystemsource";
+    ipparm "core=core_block";
+    ipparm "address=0x80000010";
+}
+ipblock m_e_first(
+    out data   :   ns(32)
+) {
+    iptype "armsystemsource";
+    ipparm "core=core_block";
+    ipparm "address=0x80000050";
+}
+ipblock m_d_first(
+    out data   :   ns(32)
+) {
+    iptype "armsystemsource";
+    ipparm "core=core_block";
+    ipparm "address=0x80000054";
+}
+
+ipblock m_z(
+    in data   :   ns(32)
+) {
+    iptype "armsystemsink";
+    ipparm "core=core_block";
+    ipparm "address=0x80000058";
+}
+ipblock m_n(
+    in data   :   ns(32)
+) {
+    iptype "armsystemsink";
+    ipparm "core=core_block";
+    ipparm "address=0x8000005C";
+}
+ipblock m_e_final(
+    in data   :   ns(32)
+) {
+    iptype "armsystemsink";
+    ipparm "core=core_block";
+    ipparm "address=0x80000060";
+}
+ipblock m_d_final(
+    in data   :   ns(32)
+) {
+    iptype "armsystemsink";
+    ipparm "core=core_block";
+    ipparm "address=0x80000064";
+}
+ipblock m_result(
+    in data   :   ns(64)
+) {
+    iptype "armsystemsink";
+    ipparm "core=core_block";
+    ipparm "address=0x80000068";
+}
+ipblock m_result_2(
+    in data   :   ns(64)
+) {
+    iptype "armsystemsink";
+    ipparm "core=core_block";
+    ipparm "address=0x800000A8";
+}
+
+dp find_e(
+    in  e_first  :   ns(32);
+    in  z   	  :   ns(32);
+    in  go	  :   ns(32);
+    out e_final   :   ns(32);
+    out done_choose_e  :   ns(1)
+) {
+    reg e_first_in 	: ns(32);
+    reg z_in 			: ns(32);
+    reg go_in 			: ns(32);
+    reg e_final_out		: ns(32);
+    reg done_choose_e_out	: ns(1);
+    reg c_out 			: ns(32);
+
+    always {
+        go_in = go;
+        e_final = e_final_out;
+        done_choose_e = (c_out == 1);
+    }
+
+    sfg init {
+        e_first_in = e_first;
+        z_in = z;
+        e_final_out = e_first;
+        c_out = 0;
+    }
+
+    sfg gcd {
+        e_first_in = (e_first_in > z_in) ? e_first_in - z_in : e_first_in;
+        z_in = (e_first_in > z_in) ? z_in : z_in - e_first_in;
+        c_out = (e_first_in > z_in) ? e_first_in : z_in;
+        done_choose_e_out = (e_first_in == 0) | (z_in == 0);
+    }
+
+    sfg loop {
+        e_first_in = e_first_in + 1;
+        e_final_out = e_final_out + 1;
+        z_in = z;
+	c_out = 0;
+        done_choose_e_out = 0;
+    }
+    sfg nothing_1 {
+	//
+    }
+}
+
+fsm find_e_fsm(find_e) {
+    initial s0;
+    state s1;
+    @s0 
+        if (go_in==1) then (init) -> s1;
+        else (nothing_1) -> s0;
+    @s1 
+        if (done_choose_e) then (nothing_1) -> s1;
+        else if (done_choose_e_out) then (loop) -> s1;
+        else (gcd) -> s1;
+}
+
+dp find_d(
+    in  e_final   	  :   ns(32);
+    in  z   	  	  :   ns(32);
+    in  d_first      	  :   ns(32);
+    in  done_choose_e          :   ns(32);
+    out d_final   	  :   ns(32);
+    out done_choose_d	  :   ns(1)
+) {
+    reg done_choose_e_in: ns(32);
+    reg d_final_out: ns(32);
+
+    always {
+        done_choose_e_in = done_choose_e;
+		d_final = d_final_out;
+		done_choose_d = (d_final_out!=0 & e_final!=0)?((d_final_out * e_final) % z == 1 | d_final_out >= z):0;
+    }
+
+    sfg init {
+        d_final_out = d_first;
+    }
+
+    sfg reduce_next {
+        d_final_out = d_final_out + 1;
+    }
+
+    sfg nothing_1 {
+        //
+    }
+}
+
+fsm find_d_fsm(find_d) {
+    initial s0;
+    state s1;
+    @s0 
+        if (done_choose_e_in==2) then (init) -> s1;
+        else (nothing_1) -> s0;
+    @s1 
+        if (done_choose_d) then (nothing_1) -> s1;
+        else (reduce_next) -> s1;
+}
+
+dp rsa_calculate (
+    in  a   		:   ns(64);
+    in  n   		:   ns(32);
+    in  module   	:   ns(32);
+    in  done_choose_d	:   ns(32);
+    in  compare   	:   ns(32);
+    out result   	:   ns(64);
+    out done		:   ns(1)
+) {
+    reg done_choose_d_in, n_in: ns(32);
+    reg a_in, result_out, i : ns(64);
+
+    always {
+        done_choose_d_in = done_choose_d;
+        result = module!=0 ? (result_out % module):0;
+        done = i > (n-1);
+    }
+
+    sfg init {
+        a_in = a;
+        n_in = n;
+        i = 0;
+        result_out = 1;
+    }
+
+    sfg multiply {
+        result_out = a_in * result_out;
+        i = i + 1;
+    }
+
+    sfg nothing_1 {
+        //
+    }
+}
+
+fsm rsa_calculate_fsm(rsa_calculate) {
+    initial s0;
+    state s1;
+
+    @s0 
+        if (done_choose_d_in==compare) then (init) -> s1;
+        else (nothing_1) -> s0;
+    @s1 
+        if (done) then (nothing_1) -> s1;
+        else (multiply) -> s1;
+}
+
+dp rsa_calculate_2 : rsa_calculate
+
+dp rsa_top() {
+    sig p, q, e_first, e_final, d_first, d_final, z, n, req, ack, go: ns(32);
+    sig result, result_2, msg : ns(64);
+    reg r_p, r_q, r_req : ns(32);
+    sig done_choose_e, done_choose_d, done_rsa, done_rsa_2 : ns(1);
+	
+    use core_block;
+    use m_req(req);
+    use m_ack(ack);
+    use m_p(p);
+    use m_q(q);
+    use m_msg(msg);
+    use m_e_first(e_first);
+    use m_d_first(d_first);
+    use m_n(n);
+    use m_z(z);
+    use m_e_final(e_final);
+    use m_d_final(d_final);
+    use m_result(result);
+    use m_result_2(result_2);
+	
+	
+    use find_e(e_first, z, go, e_final, done_choose_e);
+    use find_d(e_final, z, d_first, go, d_final, done_choose_d);
+    use rsa_calculate(msg, e_final, n, go, 3, result, done_rsa);
+    use rsa_calculate_2(result, d_final, n, go, 4, result_2, done_rsa_2);
+	
+	always{
+		z = (r_p-1)*(r_q-1);
+		n = (r_p)*(r_q);
+		
+		r_req = req; 
+		r_p = p; 
+		r_q = q; 
+	}
+	
+	sfg ack1 {ack = 1;}
+	sfg ack0 {ack = 0;}
+	
+	sfg wait {go=0;}
+	sfg start_1 {go=1;}
+	sfg start_2 {go=2;}
+	sfg start_3 {go=3;}
+	sfg start_4 {go=4;}
+
+	sfg log{
+		$display("HW:", " p=", p, " q=", q, " msg=", msg, " z=", z, " n=", n, " e_first=", e_first, " d_first=", d_first, " n=", n, " z=", z);
+		$display("-----------");
+	}
+	sfg log_msg{
+		$display("HW:" " msg=", msg);
+	}
+	sfg log_done{
+		$display("HW:", "done!");
+	}
+	sfg log_2{
+		$display("HW:", " done_choose_e=", done_choose_e, " e_final=", e_final);
+	}
+	sfg log_3{
+		$display("HW:", " done_choose_d=", done_choose_d, " d_final=", d_final);
+	}
+	sfg log_4{
+		$display("HW:", " done_encrypt=", done_rsa, " Encrypted data=", result);
+	}
+	sfg log_5{
+		$display("HW:", " done_decrypt=", done_rsa_2, " Decrypted data=", result_2);
+	}
+}
+
+fsm rsa_top_fsm(rsa_top){
+	initial s0;
+	state s1,s2,s3,s4,s5,s6,s7,s8,s9,s10;
+	
+	@s0 (ack0, wait) -> s1;
+
+    	@s1 
+        if (r_req) then (ack0, start_1,log) -> s2;
+        else (ack0, wait) -> s1;
+	
+    	@s2
+        if (done_choose_e) then (ack1, wait, log_2) -> s3;
+        else (ack0, wait) -> s2;
+
+    	@s3
+        if (~r_req) then (start_2, ack1) -> s4;
+        else (ack1, wait) -> s3;
+		
+        @s4  
+        if (done_choose_d) then (ack0, wait, log_3) -> s5;
+        else (ack1, wait) -> s4;
+
+        @s5  
+        if (r_req) then (ack1, wait, log_msg) -> s6;
+        else (ack0, wait) -> s5;
+
+        @s6  
+        if (~r_req) then (start_3, ack1) -> s7;
+        else (ack1, wait) -> s6;
+	
+	@s7
+        if (done_rsa) then (ack0, wait, log_4) -> s8;
+        else (ack1, wait) -> s7;
+	
+	@s8
+        if (r_req) then (start_4, ack0) -> s9;
+        else (ack0, wait) -> s8;
+
+	@s9
+        if (done_rsa_2) then (wait, ack1, log_5) -> s10;
+        else (ack0, wait) -> s9;
+
+	@s10
+        if (~r_req) then (wait, ack0, log_done) -> s1;
+        else (ack1, wait) -> s10;
+}
+
+system S {
+    	rsa_top;
+}

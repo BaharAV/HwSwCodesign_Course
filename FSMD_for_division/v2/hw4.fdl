@@ -1,0 +1,100 @@
+dp divider(
+	in x 		: ns(8);
+	in y 		: ns(8);
+	in start 	: ns(1);
+	out q		: ns(10);
+	out r 		: ns(8);
+	out done 	: ns(1)) {
+	
+		//reg reg_x 		: ns(8);
+		reg reg_y 		: ns(8);
+		reg reg_start 		: ns(1);
+		reg reg_q		: ns(10);
+		reg reg_r 		: ns(8);
+		
+		reg counter     : ns(4);
+		
+		sig z 		: ns(10);
+		sig a 		: ns(8);
+		sig b 		: ns(8);
+		
+		sig qin 	: ns(1);
+		sig rin 	: ns(8);
+		
+		
+		always { 	
+					$display("cycle: ", $cycle," x: ",x," y: ",y," start: ",start," q: ",q," r: ",r," done: ",done);
+					q = reg_q;
+					r = reg_r;
+					reg_start = start;
+		}
+			   
+		sfg going { 
+					done = 0;
+		}
+		sfg stoping { 
+					done = 1;
+		}
+		sfg init { 	
+					//$display("init");
+					reg_r  = x;
+					reg_y  = y;
+					reg_q  = 0;
+					counter = 8;
+			  }
+
+		sfg main_divide { 	
+					counter = counter - 1;
+					a = reg_r;
+					b = reg_y;
+					
+					z = 2*a - b;
+					qin = (z > 0x7f) ? 0 : 1;
+					rin = (z > 0x7f) ? 2*a : z;
+					
+					reg_q = (reg_q << 1) | qin;
+					reg_r = rin;
+			  }
+		sfg complete {
+					done = 0;
+					reg_r  = 0;
+					reg_y  = 0;
+					reg_q  = 0;
+			}
+			
+}
+
+fsm div_ctl(divider){
+	initial s0;
+	state s1,s2;
+	@s0 if (reg_start) then (going,main_divide) -> s1;
+			else (going,init) -> s0;
+	@s1 if (counter == 0) then (stoping) -> s2;
+			  else (going,main_divide) -> s1;
+	@s2 (complete) ->s2;
+}
+
+dp TB ( out x,y :ns(8); out start : ns(1)){
+	sfg s1 {
+		x = 12;
+		y = 15;
+		start = 1;
+	}
+}
+
+hardwired TB_ctl(TB){
+	s1;
+}
+
+dp sysdiv{
+	sig x,y,r 	   : ns(8);
+	sig q	  	   : ns(10);
+	sig start,done : ns(1);
+	
+	use divider (x, y, start, q, r, done);
+	use TB (x,y,start);
+}
+
+system S {
+	sysdiv;
+}
